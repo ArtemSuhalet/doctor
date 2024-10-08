@@ -1,0 +1,10 @@
+/.venv/
+.env
+/DejaVuSans.cw127.pkl
+/DejaVuSans.pkl
+/DejaVuSans-Bold.cw127.pkl
+/DejaVuSans-Bold.pkl
+*__pycache__/*
+.idea/
+.DS_Store
+__pycache__/
