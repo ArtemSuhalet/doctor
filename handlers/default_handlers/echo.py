@@ -67,7 +67,7 @@ def handle_audio(message: Message):
 
         # Очистка временных файлов
         os.remove("audio.ogg")
-        os.remove("transcripts.txt")
+        #os.remove("transcripts.txt")
         os.remove("summary.pdf")
         logger.info("Временные файлы удалены")
 
@@ -123,31 +123,54 @@ def save_to_pdf(filename, text):
 
 
 
+# @bot.message_handler(content_types=['text', 'audio', 'voice'])
+# def bot_echo(message: Message):
+#     logger.info(f"Получено текстовое сообщение: {message.text}")
+#     user_request = message.text
+#
+#     if user_request.startswith("/ask "):
+#         try:
+#             file_request = read_file_request()
+#             request_obj = {
+#                 "user_request": user_request,
+#                 "file_request": file_request,
+#             }
+#             requests_array.append(request_obj)
+#             response = process_gpt_request(file_request, user_request)
+#             bot.send_message(message.chat.id, response)
+#             logger.info("Запрос успешно обработан через GPT")
+#         except Exception as e:
+#             logger.error(f"Ошибка при обработке запроса: {e}")
+#             bot.send_message(message.chat.id, "An error occurred. Please try again.")
+#     else:
+#         try:
+#             response = request_chat(user_request)
+#             bot.send_message(message.chat.id, response)
+#             logger.info("Ответ на запрос отправлен")
+#         except Exception as e:
+#             logger.error(f"Ошибка при обработке запроса через Chat API: {e}")
+#             bot.send_message(message.chat.id, "An error occurred. Please try again.")
+
 @bot.message_handler(content_types=['text', 'audio', 'voice'])
 def bot_echo(message: Message):
     logger.info(f"Получено текстовое сообщение: {message.text}")
     user_request = message.text
 
-    if user_request.startswith("/ask "):
-        try:
-            file_request = read_file_request()
-            request_obj = {
-                "user_request": user_request,
-                "file_request": file_request,
-            }
-            requests_array.append(request_obj)
-            response = process_gpt_request(file_request, user_request)
-            bot.send_message(message.chat.id, response)
-            logger.info("Запрос успешно обработан через GPT")
-        except Exception as e:
-            logger.error(f"Ошибка при обработке запроса: {e}")
-            bot.send_message(message.chat.id, "An error occurred. Please try again.")
-    else:
-        try:
-            response = request_chat(user_request)
-            bot.send_message(message.chat.id, response)
-            logger.info("Ответ на запрос отправлен")
-        except Exception as e:
-            logger.error(f"Ошибка при обработке запроса через Chat API: {e}")
-            bot.send_message(message.chat.id, "An error occurred. Please try again.")
+    try:
+        # Загружаем содержимое файла
+        file_request = read_file_request()
 
+        # Формируем запрос на основе текста пользователя и содержимого файла
+        request_obj = {
+            "user_request": user_request,
+            "file_request": file_request,
+        }
+        requests_array.append(request_obj)
+
+        # Обрабатываем запрос через GPT с использованием содержимого файла
+        response = process_gpt_request_to_db(file_request, user_request)
+        bot.send_message(message.chat.id, response)
+        logger.info("Запрос успешно обработан через GPT")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса: {e}")
+        bot.send_message(message.chat.id, "Произошла ошибка. Попробуйте еще раз.")

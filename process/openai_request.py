@@ -130,6 +130,59 @@ def process_gpt_request(db, user_request, k=4):
         raise
 
 
+def process_gpt_request_to_db(db, user_request, k=4):
+    """
+    Функция для обработки запроса в GPT
+    :param db:
+    :param user_request:
+    :param k:
+    :return:
+    """
+    try:
+        logger.info(f"Обработка запроса пользователя: {user_request}")
+        docs = db.similarity_search(user_request, k=k)
+        docs_page_content = " ".join([d.page_content for d in docs])
+        logger.info(f"Найдено похожих документов: {len(docs)}")
+
+        chat = ChatOpenAI(model_name="gpt-4", temperature=0.8)
+
+        template = """
+        You're a doctor's assistant. Based on the transcript: {docs_page_content}
+        give information on the question: {user_request}, also answer questions related to the text {docs_page_content}.
+        if no information is found on this issue, say that it was not discussed in the conversation.
+
+        Only use the factual information from the transcript.
+        Translate everything only into Russian.
+        """
+
+        system_message_prompt = SystemMessagePromptTemplate.from_template(template)
+
+        chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt])
+
+        json_schema = {
+            "title": "answer",
+            "description": "answer of the doctor-client conversation.",
+            "type": "object",
+            "properties": {
+                "answer": {"type": "string"},
+            },
+            "required": ["answer"],
+        }
+
+        chain = create_structured_output_chain(json_schema, llm=chat, prompt=chat_prompt)
+
+        # Передаем переменные в функцию run
+        response = chain.run(docs_page_content=docs_page_content, user_request=user_request)
+
+        answer = response.get('answer')
+
+        logger.info("Запрос обработан успешно.")
+        return answer
+
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса: {e}")
+        raise
+
 
 def request_chat(user_request):
     """
