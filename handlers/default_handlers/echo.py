@@ -12,6 +12,63 @@ logger = logging.getLogger(__name__)
 
 requests_array = []
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+# Функция для отправки email с прикрепленным файлом
+def send_email_to_user(receiver_email, pdf_file_path):
+    try:
+        sender_email = os.getenv("SENDER_EMAIL")  # Ваша почта (mail.ru)
+        sender_password = os.getenv("SENDER_PASSWORD")  # Пароль приложения
+
+        # Создание сообщения
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        msg['Subject'] = "Ваш PDF файл"
+
+        # Текст письма
+        body = "Пожалуйста, найдите прикрепленный файл с вашими данными."
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Присоединение PDF файла
+        with open(pdf_file_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(pdf_file_path)}")
+            msg.attach(part)
+
+        # Настройка сервера Mail.ru
+        if receiver_email.endswith('@mail.ru'):
+            smtp_server = 'smtp.mail.ru'
+            smtp_port = 465  # Используем порт 465 для SSL
+        elif receiver_email.endswith('@gmail.com'):
+            smtp_server = 'smtp.gmail.com'
+            smtp_port = 587  # Для Gmail используем порт 587 с TLS
+        else:
+            logger.error(f"Неизвестный почтовый сервис для {receiver_email}")
+            return
+
+        # Подключение к серверу и отправка письма
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port) if smtp_port == 465 else smtplib.SMTP(smtp_server, smtp_port)
+        if smtp_port == 587:
+            server.starttls()
+
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+
+        logger.info(f"PDF файл успешно отправлен на почту: {receiver_email}")
+
+    except Exception as e:
+        logger.error(f"Ошибка при отправке email: {e}")
+
+
 
 @bot.message_handler(content_types=['audio', 'voice'])
 def handle_audio(message: Message):
@@ -64,6 +121,18 @@ def handle_audio(message: Message):
             time.sleep(1)
             bot.send_document(user_id, pdf_file)
         logger.info(f"PDF файл отправлен пользователю с ID {user_id}")
+
+        # Проверка наличия email у пользователя и отправка PDF на почту
+        try:
+            user = User.get(User.user_id == user_id)
+            if user.email:
+                send_email_to_user(user.email, "summary.pdf")
+                bot.send_message(user_id, f"Ваш файл также отправлен на {user.email}.")
+            else:
+                bot.send_message(user_id,
+                                 "Ваша электронная почта не указана. Если хотите получить файл на почту, добавьте её в профиле.")
+        except DoesNotExist:
+            bot.send_message(user_id, "Ваш профиль не найден в базе данных.")
 
         # Очистка временных файлов
         os.remove("audio.ogg")
